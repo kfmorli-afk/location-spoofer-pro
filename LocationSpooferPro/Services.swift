@@ -99,7 +99,6 @@ class LocationSimulator: ObservableObject {
         DispatchQueue.main.async { self.status = .connecting }
         addLog("Starte GPS-Spoofing auf \(host):\(port)...", level: .info)
 
-        var lastError: Error?
         var resolvedPort: UInt16 = port
 
         // --- STRATEGY 1: Full Apple Lockdownd Handshake with ValidatePairing ---
@@ -110,7 +109,6 @@ class LocationSimulator: ObservableObject {
             resolvedPort = targetPort
         } catch {
             addLog("Methode 1 Info: \(error.localizedDescription)", level: .warning)
-            lastError = error
 
             // --- STRATEGY 2: Direct StartService without Validation ---
             addLog("▶ Methode 2: Direkte Dienstanforderung...", level: .info)
@@ -120,8 +118,6 @@ class LocationSimulator: ObservableObject {
                 resolvedPort = targetPort
             } catch {
                 addLog("Methode 2 Info: \(error.localizedDescription)", level: .warning)
-                lastError = error
-                // Fallback to direct port
                 resolvedPort = port
             }
         }
@@ -134,9 +130,8 @@ class LocationSimulator: ObservableObject {
             completeSpoofSuccess(coordinate)
         } catch {
             DispatchQueue.main.async { self.status = .error }
-            let finalErr = lastError ?? error
-            addLog("Spoofing-Fehler: \(finalErr.localizedDescription)", level: .error)
-            throw finalErr
+            addLog("Spoofing-Fehler: \(error.localizedDescription)", level: .error)
+            throw error
         }
     }
 
@@ -154,7 +149,7 @@ class LocationSimulator: ObservableObject {
     func reset(host: String = "10.7.0.1", port: UInt16 = 62078) async {
         addLog("Setze Standort auf echtes GPS zurück...", level: .info)
         stopHeartbeat()
-        
+
         if let conn = activeConnection {
             let resetPacket = makeResetPacket()
             conn.send(content: resetPacket, completion: .contentProcessed { _ in })
@@ -269,6 +264,7 @@ class LocationSimulator: ObservableObject {
             conn.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
+                    // Step 1: QueryType
                     let queryDict: [String: Any] = ["Request": "QueryType"]
                     self.sendPlist(queryDict, over: conn) { qErr in
                         if let qErr = qErr { finishWithError(qErr); return }
@@ -277,8 +273,10 @@ class LocationSimulator: ObservableObject {
                             switch qRes {
                             case .failure(let err): finishWithError(err)
                             case .success(let typeDict):
-                                self.addLog("Lockdownd: \(typeDict["Type"] as? String ?? "OK")", level: .info)
+                                let typeName = typeDict["Type"] as? String ?? "OK"
+                                self.addLog("Lockdownd: \(typeName)", level: .info)
 
+                                // Step 2: ValidatePairing
                                 let validateDict: [String: Any] = [
                                     "Request": "ValidatePairing",
                                     "PairingRecord": pairing.toPlistDictionary()
@@ -287,6 +285,10 @@ class LocationSimulator: ObservableObject {
                                     if let vErr = vErr { finishWithError(vErr); return }
 
                                     self.receivePlist(over: conn) { vRes in
+                                        let vResult = (try? vRes.get())?["Result"] as? String ?? "Success"
+                                        self.addLog("Pairing: \(vResult)", level: .info)
+
+                                        // Step 3: StartService com.apple.dt.simulatelocation
                                         let startDict: [String: Any] = [
                                             "Request": "StartService",
                                             "Service": "com.apple.dt.simulatelocation"
@@ -396,7 +398,7 @@ class LocationSimulator: ObservableObject {
         }
     }
 
-    // MARK: - Plist Transport Helpers
+    // MARK: - Robust Exact-Length Plist Transport
 
     private func sendPlist(_ dict: [String: Any], over connection: NWConnection, completion: @escaping (Error?) -> Void) {
         do {
@@ -413,45 +415,69 @@ class LocationSimulator: ObservableObject {
         }
     }
 
-    private func receivePlist(over connection: NWConnection, completion: @escaping (Result<[String: Any], Error>) -> Void) {
-        connection.receive(minimumIncompleteLength: 4, maximumLength: 4) { content, _, _, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            guard let data = content, data.count == 4 else {
-                let err = NSError(domain: "Lockdownd", code: -3, userInfo: [NSLocalizedDescriptionKey: "Ungültige Header-Größe"])
-                completion(.failure(err))
+    private func receiveExact(bytes count: Int, over connection: NWConnection, completion: @escaping (Result<Data, Error>) -> Void) {
+        var buffer = Data()
+
+        func readChunk() {
+            let needed = count - buffer.count
+            guard needed > 0 else {
+                completion(.success(buffer))
                 return
             }
 
-            let length = UInt32(bigEndian: data.withUnsafeBytes { $0.load(as: UInt32.self) })
-            guard length > 0, length < 1_000_000 else {
-                let err = NSError(domain: "Lockdownd", code: -4, userInfo: [NSLocalizedDescriptionKey: "Ungültige Payload-Größe (\(length))"])
-                completion(.failure(err))
-                return
-            }
-
-            connection.receive(minimumIncompleteLength: Int(length), maximumLength: Int(length)) { payload, _, _, pError in
-                if let pError = pError {
-                    completion(.failure(pError))
+            connection.receive(minimumIncompleteLength: 1, maximumLength: needed) { content, _, isComplete, error in
+                if let error = error {
+                    completion(.failure(error))
                     return
                 }
-                guard let pData = payload else {
-                    let err = NSError(domain: "Lockdownd", code: -5, userInfo: [NSLocalizedDescriptionKey: "Keine Daten empfangen"])
+                if let data = content, !data.isEmpty {
+                    buffer.append(data)
+                    if buffer.count >= count {
+                        completion(.success(buffer.prefix(count)))
+                    } else {
+                        readChunk()
+                    }
+                } else if isComplete {
+                    let err = NSError(domain: "Lockdownd", code: -3, userInfo: [NSLocalizedDescriptionKey: "Verbindung vorzeitig beendet (\(buffer.count)/\(count) Bytes)"])
+                    completion(.failure(err))
+                }
+            }
+        }
+
+        readChunk()
+    }
+
+    private func receivePlist(over connection: NWConnection, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        // Step 1: Read 4-byte big endian length header
+        receiveExact(bytes: 4, over: connection) { lenResult in
+            switch lenResult {
+            case .failure(let err):
+                completion(.failure(err))
+            case .success(let headerData):
+                let length = UInt32(bigEndian: headerData.withUnsafeBytes { $0.load(as: UInt32.self) })
+                guard length > 0, length < 10_000_000 else {
+                    let err = NSError(domain: "Lockdownd", code: -4, userInfo: [NSLocalizedDescriptionKey: "Ungültige Payload-Größe: \(length)"])
                     completion(.failure(err))
                     return
                 }
 
-                do {
-                    if let dict = try PropertyListSerialization.propertyList(from: pData, options: [], format: nil) as? [String: Any] {
-                        completion(.success(dict))
-                    } else {
-                        let err = NSError(domain: "Lockdownd", code: -6, userInfo: [NSLocalizedDescriptionKey: "Plist konnte nicht geparst werden"])
-                        completion(.failure(err))
+                // Step 2: Read exact payload bytes
+                self.receiveExact(bytes: Int(length), over: connection) { payloadResult in
+                    switch payloadResult {
+                    case .failure(let pErr):
+                        completion(.failure(pErr))
+                    case .success(let payloadData):
+                        do {
+                            if let dict = try PropertyListSerialization.propertyList(from: payloadData, options: [], format: nil) as? [String: Any] {
+                                completion(.success(dict))
+                            } else {
+                                let err = NSError(domain: "Lockdownd", code: -6, userInfo: [NSLocalizedDescriptionKey: "Plist konnte nicht dekodiert werden"])
+                                completion(.failure(err))
+                            }
+                        } catch {
+                            completion(.failure(error))
+                        }
                     }
-                } catch {
-                    completion(.failure(error))
                 }
             }
         }
