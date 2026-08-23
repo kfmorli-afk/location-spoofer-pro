@@ -97,10 +97,10 @@ class LocationSimulator: ObservableObject {
         addLog(String(format: "Zielkoordinaten: %.5f, %.5f", coordinate.latitude, coordinate.longitude), level: .info)
 
         // Step 1: Discover Active Lockdownd Host IP
-        let candidateHosts = [host, "10.7.0.2", "127.0.0.1", "10.7.0.1", "::1", "localhost"]
+        let candidateHosts = [host, "10.7.0.2", "172.20.10.1", "127.0.0.1", "10.7.0.1", "::1", "localhost"]
         var workingHost: String?
 
-        addLog("▶ Suche aktiven Lockdownd-Kanal (WLAN Sync erforderlich)...", level: .info)
+        addLog("▶ Suche aktiven Lockdownd-Kanal (WLAN/Hotspot erforderlich)...", level: .info)
         for candidate in candidateHosts {
             if await probeLockdownd(host: candidate, port: port) {
                 workingHost = candidate
@@ -112,8 +112,8 @@ class LocationSimulator: ObservableObject {
         let effectiveHost = workingHost ?? host
         if workingHost == nil {
             addLog("❌ Kein Lockdownd-QueryType auf Standard-IPs möglich.", level: .error)
-            addLog("⚠️ WICHTIG: Port 62078 ist GESCHLOSSEN. Bitte verbinde das iPhone per USB mit dem PC, öffne iTunes/Apple Devices und aktiviere 'Mit diesem iPhone über WLAN synchronisieren'!", level: .warning)
-            addLog("Versuche trotzdem Direktverbindung auf \(effectiveHost)...", level: .warning)
+            addLog("⚠️ WICHTIG: Der Apple-Dienst ist blockiert. Du musst KEINEN Port in iTunes eingeben! Setze in iTunes einfach nur den Haken bei 'Mit diesem iPhone über WLAN synchronisieren'.", level: .warning)
+            addLog("💡 LTE/5G TRICK: Schalte 'Persönlicher Hotspot' ein! Dadurch wird der Dienst auch ohne WLAN-Netzwerk aktiviert.", level: .warning)
         }
 
         self.currentHost = effectiveHost
