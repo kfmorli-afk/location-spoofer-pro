@@ -215,7 +215,7 @@ class LocationSimulator: ObservableObject {
 
     // MARK: - Reset Action
 
-    func func reset(host: String = "10.7.0.1", port: UInt16 = 62078) async {
+    func reset(host: String = "10.7.0.1", port: UInt16 = 62078) async {
         addLog("Setze Standort auf echtes GPS zurück...", level: .info)
         stopHeartbeat()
 
@@ -316,14 +316,14 @@ class LocationSimulator: ObservableObject {
             )
             let gate = ContinuationGate()
 
-            func finishWithError(_ err: Error) {
+            @Sendable func finishWithError(_ err: Error) {
                 if gate.claim() {
                     conn.cancel()
                     continuation.resume(throwing: err)
                 }
             }
 
-            func finishWithSuccess(targetPort: UInt16) {
+            @Sendable func finishWithSuccess(targetPort: UInt16) {
                 if gate.claim() {
                     conn.cancel()
                     continuation.resume(returning: targetPort)
@@ -412,14 +412,14 @@ class LocationSimulator: ObservableObject {
             )
             let gate = ContinuationGate()
 
-            func finishWithError(_ err: Error) {
+            @Sendable func finishWithError(_ err: Error) {
                 if gate.claim() {
                     conn.cancel()
                     continuation.resume(throwing: err)
                 }
             }
 
-            func finishWithSuccess(targetPort: UInt16) {
+            @Sendable func finishWithSuccess(targetPort: UInt16) {
                 if gate.claim() {
                     conn.cancel()
                     continuation.resume(returning: targetPort)
