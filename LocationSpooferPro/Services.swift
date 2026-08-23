@@ -100,7 +100,7 @@ class LocationSimulator: ObservableObject {
         let candidateHosts = [host, "10.7.0.2", "127.0.0.1", "10.7.0.1", "::1", "localhost"]
         var workingHost: String?
 
-        addLog("▶ Suche aktiven Lockdownd-Kanal...", level: .info)
+        addLog("▶ Suche aktiven Lockdownd-Kanal (WLAN Sync erforderlich)...", level: .info)
         for candidate in candidateHosts {
             if await probeLockdownd(host: candidate, port: port) {
                 workingHost = candidate
@@ -111,7 +111,9 @@ class LocationSimulator: ObservableObject {
 
         let effectiveHost = workingHost ?? host
         if workingHost == nil {
-            addLog("Hinweis: Kein Lockdownd-QueryType auf Standard-IPs. Versuche Direktverbindung auf \(effectiveHost)...", level: .warning)
+            addLog("❌ Kein Lockdownd-QueryType auf Standard-IPs möglich.", level: .error)
+            addLog("⚠️ WICHTIG: Port 62078 ist GESCHLOSSEN. Bitte verbinde das iPhone per USB mit dem PC, öffne iTunes/Apple Devices und aktiviere 'Mit diesem iPhone über WLAN synchronisieren'!", level: .warning)
+            addLog("Versuche trotzdem Direktverbindung auf \(effectiveHost)...", level: .warning)
         }
 
         self.currentHost = effectiveHost
@@ -126,7 +128,11 @@ class LocationSimulator: ObservableObject {
             addLog("✅ Dienst bereit auf Port \(targetPort)", level: .success)
             resolvedPort = targetPort
         } catch {
-            addLog("Handshake Info: \(error.localizedDescription)", level: .warning)
+            let errMsg = error.localizedDescription
+            addLog("Handshake Info: \(errMsg)", level: .warning)
+            if errMsg.contains("54") || errMsg.contains("Connection reset by peer") {
+                addLog("💡 LÖSUNG für Fehler 54: WLAN-Sync am PC in iTunes aktivieren! WLAN muss am iPhone eingeschaltet sein.", level: .error)
+            }
 
             // Step 3: Direct StartService Fallback
             do {
@@ -209,7 +215,7 @@ class LocationSimulator: ObservableObject {
 
     // MARK: - Reset Action
 
-    func reset(host: String = "10.7.0.1", port: UInt16 = 62078) async {
+    func func reset(host: String = "10.7.0.1", port: UInt16 = 62078) async {
         addLog("Setze Standort auf echtes GPS zurück...", level: .info)
         stopHeartbeat()
 
