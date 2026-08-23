@@ -23,7 +23,10 @@ jobs:
 
       - name: Build App with Xcodebuild
         run: |
-          mkdir -p build
+          # GitHub-hosted macOS runners do not have this project's signing
+          # certificate or provisioning profile. Build an unsigned device app;
+          # Sideloadly (or another sideloading tool) signs the resulting IPA.
+          mkdir -p build/Release-iphoneos
           set -o pipefail
           xcodebuild build \
             -project LocationSpooferPro.xcodeproj \
@@ -31,18 +34,22 @@ jobs:
             -configuration Release \
             -destination "generic/platform=iOS" \
             -derivedDataPath build/DerivedData \
+            CONFIGURATION_BUILD_DIR="$PWD/build/Release-iphoneos" \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=YES \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            DEVELOPMENT_TEAM="" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
+            CODE_SIGNING_ALLOWED=NO \
           2>&1 | tee build/build.log
           BUILD_EXIT=${PIPESTATUS[0]}
           if [ $BUILD_EXIT -ne 0 ]; then
-            echo ""
-            echo "==== BUILD ERRORS ===="
-            grep -E "error:|warning:|note:" build/build.log | tail -60
+            echo "## ❌ Build Failed — Swift Errors" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep -E " error: | warning: " build/build.log | head -80 >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Last 40 lines of build log:" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -40 build/build.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
             exit $BUILD_EXIT
           fi
 
@@ -55,17 +62,27 @@ jobs:
 
       - name: Package App into IPA
         run: |
-          APP_PATH=$(find build/DerivedData -name "*.app" -not -path "*/iphonesimulator/*" | head -1)
-          echo "App found at: $APP_PATH"
-          mkdir -p Payload
-          cp -r "$APP_PATH" Payload/
-          zip -r LocationSpooferPro.ipa Payload
-          rm -rf Payload
-          ls -lh LocationSpooferPro.ipa
+          APP_PATH="build/Release-iphoneos/LocationSpooferPro.app"
+          IPA_PATH="build/LocationSpooferPro.ipa"
+
+          # Fail here with a useful error instead of creating an empty IPA when
+          # Xcode changes its derived-data layout or no device app was built.
+          test -d "$APP_PATH"
+          test -f "$APP_PATH/Info.plist"
+          test -f "$APP_PATH/LocationSpooferPro"
+
+          mkdir -p build/Payload
+          ditto "$APP_PATH" "build/Payload/LocationSpooferPro.app"
+          (
+            cd build
+            /usr/bin/zip -qry "LocationSpooferPro.ipa" Payload
+          )
+          unzip -l "$IPA_PATH" | grep -q "Payload/LocationSpooferPro.app/Info.plist"
+          ls -lh "$IPA_PATH"
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: LocationSpooferPro-IPA
-          path: LocationSpooferPro.ipa
+          path: build/LocationSpooferPro.ipa
           retention-days: 30
