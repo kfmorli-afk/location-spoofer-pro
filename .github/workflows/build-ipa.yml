@@ -16,11 +16,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode Version
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
-
-      - name: Show Xcode Version
-        run: xcodebuild -version
+      - name: Show Available Xcode & SDKs
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcodebuild -list
 
       - name: Build App with Xcodebuild (Unsigned for Sideloadly)
         run: |
@@ -28,7 +28,7 @@ jobs:
             -project LocationSpooferPro.xcodeproj \
             -scheme LocationSpooferPro \
             -configuration Release \
-            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
             -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
