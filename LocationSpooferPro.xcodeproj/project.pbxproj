@@ -7,62 +7,33 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		010001 /* LocationSpooferProApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020001 /* LocationSpooferProApp.swift */; };
-		010002 /* SavedLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020002 /* SavedLocation.swift */; };
-		010003 /* PairingRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020003 /* PairingRecord.swift */; };
-		010004 /* SimulationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020004 /* SimulationState.swift */; };
-		010005 /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020005 /* LocationManager.swift */; };
-		010006 /* GeocodingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020006 /* GeocodingService.swift */; };
-		010007 /* PairingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020007 /* PairingService.swift */; };
-		010008 /* LockdownClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020008 /* LockdownClient.swift */; };
-		010009 /* LocationSimulationClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020009 /* LocationSimulationClient.swift */; };
-		010010 /* MovementSimulator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020010 /* MovementSimulator.swift */; };
-		010011 /* MapViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020011 /* MapViewModel.swift */; };
-		010012 /* SearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020012 /* SearchViewModel.swift */; };
-		010013 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020013 /* SettingsViewModel.swift */; };
-		010014 /* SearchBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020014 /* SearchBarView.swift */; };
-		010015 /* SearchResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020015 /* SearchResultsView.swift */; };
-		010016 /* LocationControlCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020016 /* LocationControlCard.swift */; };
-		010017 /* JoystickOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020017 /* JoystickOverlayView.swift */; };
-		010018 /* StatusIndicatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020018 /* StatusIndicatorView.swift */; };
-		010019 /* FavoritesSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020019 /* FavoritesSheetView.swift */; };
-		010020 /* SettingsSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020020 /* SettingsSheetView.swift */; };
-		010021 /* LogConsoleSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020021 /* LogConsoleSheetView.swift */; };
-		010022 /* MainMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020022 /* MainMapView.swift */; };
-		010023 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 020023 /* Assets.xcassets */; };
+		11000001 /* LocationSpooferProApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21000001 /* LocationSpooferProApp.swift */; };
+		11000002 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21000002 /* Models.swift */; };
+		11000003 /* Services.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21000003 /* Services.swift */; };
+		11000004 /* ViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21000004 /* ViewModels.swift */; };
+		11000005 /* MainMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21000005 /* MainMapView.swift */; };
+		11000006 /* ControlCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21000006 /* ControlCard.swift */; };
+		11000007 /* SearchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21000007 /* SearchViews.swift */; };
+		11000008 /* Sheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21000008 /* Sheets.swift */; };
+		11000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 21000009 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		000001 /* LocationSpooferPro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LocationSpooferPro.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		020001 /* LocationSpooferProApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationSpooferProApp.swift; sourceTree = "<group>"; };
-		020002 /* SavedLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedLocation.swift; sourceTree = "<group>"; };
-		020003 /* PairingRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingRecord.swift; sourceTree = "<group>"; };
-		020004 /* SimulationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulationState.swift; sourceTree = "<group>"; };
-		020005 /* LocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
-		020006 /* GeocodingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeocodingService.swift; sourceTree = "<group>"; };
-		020007 /* PairingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingService.swift; sourceTree = "<group>"; };
-		020008 /* LockdownClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockdownClient.swift; sourceTree = "<group>"; };
-		020009 /* LocationSimulationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationSimulationClient.swift; sourceTree = "<group>"; };
-		020010 /* MovementSimulator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovementSimulator.swift; sourceTree = "<group>"; };
-		020011 /* MapViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapViewModel.swift; sourceTree = "<group>"; };
-		020012 /* SearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewModel.swift; sourceTree = "<group>"; };
-		020013 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
-		020014 /* SearchBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchBarView.swift; sourceTree = "<group>"; };
-		020015 /* SearchResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResultsView.swift; sourceTree = "<group>"; };
-		020016 /* LocationControlCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationControlCard.swift; sourceTree = "<group>"; };
-		020017 /* JoystickOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoystickOverlayView.swift; sourceTree = "<group>"; };
-		020018 /* StatusIndicatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusIndicatorView.swift; sourceTree = "<group>"; };
-		020019 /* FavoritesSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesSheetView.swift; sourceTree = "<group>"; };
-		020020 /* SettingsSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheetView.swift; sourceTree = "<group>"; };
-		020021 /* LogConsoleSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogConsoleSheetView.swift; sourceTree = "<group>"; };
-		020022 /* MainMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMapView.swift; sourceTree = "<group>"; };
-		020023 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		020024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		020025 /* LocationSpooferPro.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LocationSpooferPro.entitlements; sourceTree = "<group>"; };
+		00000001 /* LocationSpooferPro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LocationSpooferPro.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		21000001 /* LocationSpooferProApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationSpooferProApp.swift; sourceTree = "<group>"; };
+		21000002 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		21000003 /* Services.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services.swift; sourceTree = "<group>"; };
+		21000004 /* ViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModels.swift; sourceTree = "<group>"; };
+		21000005 /* MainMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMapView.swift; sourceTree = "<group>"; };
+		21000006 /* ControlCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCard.swift; sourceTree = "<group>"; };
+		21000007 /* SearchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViews.swift; sourceTree = "<group>"; };
+		21000008 /* Sheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sheets.swift; sourceTree = "<group>"; };
+		21000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		21000010 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		030001 /* Frameworks */ = {
+		31000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -72,120 +43,49 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		040001 /* MainGroup */ = {
+		41000001 /* MainGroup */ = {
 			isa = PBXGroup;
 			children = (
-				040002 /* LocationSpooferPro */,
-				040003 /* Products */,
+				41000002 /* LocationSpooferPro */,
+				41000003 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		040002 /* LocationSpooferPro */ = {
+		41000002 /* LocationSpooferPro */ = {
 			isa = PBXGroup;
 			children = (
-				040004 /* App */,
-				040005 /* Models */,
-				040006 /* Services */,
-				040007 /* ViewModels */,
-				040008 /* Views */,
-				020023 /* Assets.xcassets */,
+				21000001 /* LocationSpooferProApp.swift */,
+				21000002 /* Models.swift */,
+				21000003 /* Services.swift */,
+				21000004 /* ViewModels.swift */,
+				21000005 /* MainMapView.swift */,
+				21000006 /* ControlCard.swift */,
+				21000007 /* SearchViews.swift */,
+				21000008 /* Sheets.swift */,
+				21000009 /* Assets.xcassets */,
+				21000010 /* Info.plist */,
 			);
 			path = LocationSpooferPro;
 			sourceTree = "<group>";
 		};
-		040003 /* Products */ = {
+		41000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				000001 /* LocationSpooferPro.app */,
+				00000001 /* LocationSpooferPro.app */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		040004 /* App */ = {
-			isa = PBXGroup;
-			children = (
-				020001 /* LocationSpooferProApp.swift */,
-				020024 /* Info.plist */,
-				020025 /* LocationSpooferPro.entitlements */,
-			);
-			path = App;
-			sourceTree = "<group>";
-		};
-		040005 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				020002 /* SavedLocation.swift */,
-				020003 /* PairingRecord.swift */,
-				020004 /* SimulationState.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		040006 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				020005 /* LocationManager.swift */,
-				020006 /* GeocodingService.swift */,
-				020007 /* PairingService.swift */,
-				020008 /* LockdownClient.swift */,
-				020009 /* LocationSimulationClient.swift */,
-				020010 /* MovementSimulator.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
-		040007 /* ViewModels */ = {
-			isa = PBXGroup;
-			children = (
-				020011 /* MapViewModel.swift */,
-				020012 /* SearchViewModel.swift */,
-				020013 /* SettingsViewModel.swift */,
-			);
-			path = ViewModels;
-			sourceTree = "<group>";
-		};
-		040008 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				020022 /* MainMapView.swift */,
-				040009 /* Components */,
-				040010 /* Sheets */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
-		040009 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				020014 /* SearchBarView.swift */,
-				020015 /* SearchResultsView.swift */,
-				020016 /* LocationControlCard.swift */,
-				020017 /* JoystickOverlayView.swift */,
-				020018 /* StatusIndicatorView.swift */,
-			);
-			path = Components;
-			sourceTree = "<group>";
-		};
-		040010 /* Sheets */ = {
-			isa = PBXGroup;
-			children = (
-				020019 /* FavoritesSheetView.swift */,
-				020020 /* SettingsSheetView.swift */,
-				020021 /* LogConsoleSheetView.swift */,
-			);
-			path = Sheets;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		050001 /* LocationSpooferPro */ = {
+		51000001 /* LocationSpooferPro */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 060001 /* Build configuration list for PBXNativeTarget "LocationSpooferPro" */;
+			buildConfigurationList = 61000001 /* Build configuration list for PBXNativeTarget "LocationSpooferPro" */;
 			buildPhases = (
-				070001 /* Sources */,
-				030001 /* Frameworks */,
-				080001 /* Resources */,
+				71000001 /* Sources */,
+				31000001 /* Frameworks */,
+				81000001 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -193,174 +93,118 @@
 			);
 			name = LocationSpooferPro;
 			productName = LocationSpooferPro;
-			productReference = 000001 /* LocationSpooferPro.app */;
+			productReference = 00000001 /* LocationSpooferPro.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		000000 /* Project object */ = {
+		00000000 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
-					050001 = {
+					51000001 = {
 						CreatedOnToolsVersion = 16.0;
-						DevelopmentTeam = "";
-						ProvisioningStyle = Automatic;
 					};
 				};
 			};
-			buildConfigurationList = 060002 /* Build configuration list for PBXProject "LocationSpooferPro" */;
+			buildConfigurationList = 61000002 /* Build configuration list for PBXProject "LocationSpooferPro" */;
 			compatibilityVersion = "Xcode 14.0";
-			developmentRegion = de;
+			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				de,
 				en,
 				Base,
 			);
-			mainGroup = 040001 /* MainGroup */;
-			productRefGroup = 040003 /* Products */;
+			mainGroup = 41000001 /* MainGroup */;
+			productRefGroup = 41000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				050001 /* LocationSpooferPro */,
+				51000001 /* LocationSpooferPro */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		080001 /* Resources */ = {
+		81000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				010023 /* Assets.xcassets in Resources */,
+				11000009 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		070001 /* Sources */ = {
+		71000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				010001 /* LocationSpooferProApp.swift in Sources */,
-				010002 /* SavedLocation.swift in Sources */,
-				010003 /* PairingRecord.swift in Sources */,
-				010004 /* SimulationState.swift in Sources */,
-				010005 /* LocationManager.swift in Sources */,
-				010006 /* GeocodingService.swift in Sources */,
-				010007 /* PairingService.swift in Sources */,
-				010008 /* LockdownClient.swift in Sources */,
-				010009 /* LocationSimulationClient.swift in Sources */,
-				010010 /* MovementSimulator.swift in Sources */,
-				010011 /* MapViewModel.swift in Sources */,
-				010012 /* SearchViewModel.swift in Sources */,
-				010013 /* SettingsViewModel.swift in Sources */,
-				010014 /* SearchBarView.swift in Sources */,
-				010015 /* SearchResultsView.swift in Sources */,
-				010016 /* LocationControlCard.swift in Sources */,
-				010017 /* JoystickOverlayView.swift in Sources */,
-				010018 /* StatusIndicatorView.swift in Sources */,
-				010019 /* FavoritesSheetView.swift in Sources */,
-				010020 /* SettingsSheetView.swift in Sources */,
-				010021 /* LogConsoleSheetView.swift in Sources */,
-				010022 /* MainMapView.swift in Sources */,
+				11000001 /* LocationSpooferProApp.swift in Sources */,
+				11000002 /* Models.swift in Sources */,
+				11000003 /* Services.swift in Sources */,
+				11000004 /* ViewModels.swift in Sources */,
+				11000005 /* MainMapView.swift in Sources */,
+				11000006 /* ControlCard.swift in Sources */,
+				11000007 /* SearchViews.swift in Sources */,
+				11000008 /* Sheets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		060003 /* Debug */ = {
+		62000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGNING_ALLOWED = YES;
-				AD_HOC_CODE_SIGNING_ALLOWED = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
-				ENABLE_BITCODE = NO;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_TESTABILITY = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"DEBUG=1",
-					"$(inherited)",
-				);
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = LocationSpooferPro/App/Info.plist;
+				INFOPLIST_FILE = LocationSpooferPro/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
-				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-				MTL_FAST_MATH = YES;
-				ONLY_ACTIVE_ARCH = YES;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = pro.locationspoofer.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
-		060004 /* Release */ = {
+		62000002 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGNING_ALLOWED = YES;
-				AD_HOC_CODE_SIGNING_ALLOWED = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
-				ENABLE_BITCODE = NO;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_NO_COMMON_BLOCKS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = LocationSpooferPro/App/Info.plist;
+				INFOPLIST_FILE = LocationSpooferPro/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
-				MTL_FAST_MATH = YES;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = pro.locationspoofer.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -371,34 +215,18 @@
 			};
 			name = Release;
 		};
-		060005 /* Debug */ = {
+		62000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				ENABLE_TESTABILITY = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_OPTIMIZATION_LEVEL = 0;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
-		060006 /* Release */ = {
+		62000004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_NO_COMMON_BLOCKS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
@@ -408,20 +236,20 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		060001 /* Build configuration list for PBXNativeTarget "LocationSpooferPro" */ = {
+		61000001 /* Build configuration list for PBXNativeTarget "LocationSpooferPro" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				060003 /* Debug */,
-				060004 /* Release */,
+				62000001 /* Debug */,
+				62000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		060002 /* Build configuration list for PBXProject "LocationSpooferPro" */ = {
+		61000002 /* Build configuration list for PBXProject "LocationSpooferPro" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				060005 /* Debug */,
-				060006 /* Release */,
+				62000003 /* Debug */,
+				62000004 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -429,5 +257,5 @@
 /* End XCConfigurationList section */
 
 	};
-	rootObject = 000000 /* Project object */;
+	rootObject = 00000000 /* Project object */;
 }

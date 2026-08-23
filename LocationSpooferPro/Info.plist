@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>de</string>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Location Spoofer Pro</string>
 	<key>CFBundleExecutable</key>
@@ -17,38 +17,26 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Location Spoofer Pro benötigt Zugriff auf Ihren Standort, um Ihren echten Standort auf der Apple Maps Karte anzuzeigen.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Location Spoofer Pro benötigt Zugriff auf Ihren Standort für präzise Simulationen.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Location Spoofer Pro benötigt Zugriff auf das lokale Netzwerk, um mit Local Dev VPN und dem Lockdown-Daemon zu kommunizieren.</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>location</string>
-		<string>processing</string>
-	</array>
+	<string>Location Spoofer Pro benötigt Zugriff auf deinen Standort für die Karte.</string>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>arm64</string>
+		<string>armv7</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UIUserInterfaceStyle</key>
 	<string>Dark</string>

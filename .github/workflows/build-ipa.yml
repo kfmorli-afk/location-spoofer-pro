@@ -2,9 +2,7 @@ name: Build Location Spoofer Pro IPA
 
 on:
   push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -18,11 +16,14 @@ jobs:
 
       - name: Show Xcode Info
         run: |
+          xcode-select -p
           xcodebuild -version
-          xcodebuild -list
+          echo "---"
+          xcodebuild -list -project LocationSpooferPro.xcodeproj 2>&1 || true
 
       - name: Build App with Xcodebuild
         run: |
+          mkdir -p build
           set -o pipefail
           xcodebuild build \
             -project LocationSpooferPro.xcodeproj \
@@ -35,20 +36,36 @@ jobs:
             CODE_SIGNING_ALLOWED=YES \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             DEVELOPMENT_TEAM="" \
-            PROVISIONING_PROFILE_SPECIFIER=""
+            PROVISIONING_PROFILE_SPECIFIER="" \
+          2>&1 | tee build/build.log
+          BUILD_EXIT=${PIPESTATUS[0]}
+          if [ $BUILD_EXIT -ne 0 ]; then
+            echo ""
+            echo "==== BUILD ERRORS ===="
+            grep -E "error:|warning:|note:" build/build.log | tail -60
+            exit $BUILD_EXIT
+          fi
+
+      - name: Upload Build Log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build/build.log
 
       - name: Package App into IPA
         run: |
-          mkdir -p build/Payload
-          cp -r build/DerivedData/Build/Products/Release-iphoneos/LocationSpooferPro.app build/Payload/
-          cd build
+          APP_PATH=$(find build/DerivedData -name "*.app" -not -path "*/iphonesimulator/*" | head -1)
+          echo "App found at: $APP_PATH"
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/
           zip -r LocationSpooferPro.ipa Payload
-          cd ..
-          ls -lh build/LocationSpooferPro.ipa
+          rm -rf Payload
+          ls -lh LocationSpooferPro.ipa
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: LocationSpooferPro-IPA
-          path: build/LocationSpooferPro.ipa
-          retention-days: 14
+          path: LocationSpooferPro.ipa
+          retention-days: 30
