@@ -97,7 +97,9 @@ class LocationSimulator: ObservableObject {
         addLog(String(format: "Zielkoordinaten: %.5f, %.5f", coordinate.latitude, coordinate.longitude), level: .info)
 
         // Step 1: Discover Active Lockdownd Host IP
-        let candidateHosts = [host, "10.7.0.2", "172.20.10.1", "127.0.0.1", "10.7.0.1", "::1", "localhost"]
+        var candidateHosts = [host, "10.7.0.2", "172.20.10.1", "127.0.0.1", "10.7.0.1", "::1", "localhost"]
+        candidateHosts.append(contentsOf: getLocalIPAddresses())
+        candidateHosts = Array(Set(candidateHosts)) // Deduplicate
         var workingHost: String?
 
         addLog("▶ Suche aktiven Lockdownd-Kanal (WLAN/Hotspot erforderlich)...", level: .info)
@@ -165,6 +167,36 @@ class LocationSimulator: ObservableObject {
             self.status = .spoofing
         }
         addLog(String(format: "GPS-Signal aktiv & dauerhaft übertragen: %.5f, %.5f 📍", coordinate.latitude, coordinate.longitude), level: .success)
+    }
+
+    // MARK: - IP Discovery
+
+    private func getLocalIPAddresses() -> [String] {
+        var addresses = [String]()
+        var ifaddr: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifaddr) == 0 else { return addresses }
+        guard let firstAddr = ifaddr else { return addresses }
+
+        for ptr in sequence(first: firstAddr, next: { $0.pointee.ifa_next }) {
+            let flags = Int32(ptr.pointee.ifa_flags)
+            let addr = ptr.pointee.ifa_addr.pointee
+
+            if (flags & (IFF_UP|IFF_RUNNING|IFF_LOOPBACK)) == (IFF_UP|IFF_RUNNING) {
+                if addr.sa_family == UInt8(AF_INET) || addr.sa_family == UInt8(AF_INET6) {
+                    var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                    if getnameinfo(ptr.pointee.ifa_addr, socklen_t(addr.sa_len),
+                                   &hostname, socklen_t(hostname.count),
+                                   nil, 0, NI_NUMERICHOST) == 0 {
+                        let address = String(cString: hostname)
+                        if !address.contains("%") { // Skip IPv6 scope IDs
+                            addresses.append(address)
+                        }
+                    }
+                }
+            }
+        }
+        freeifaddrs(ifaddr)
+        return addresses
     }
 
     // MARK: - Lockdownd Probe
