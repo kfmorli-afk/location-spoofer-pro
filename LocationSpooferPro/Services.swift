@@ -3,6 +3,21 @@ import CoreLocation
 import MapKit
 import Network
 
+/// Synchronizes callbacks that race to finish the same Swift continuation.
+/// `NWConnection` state changes and the timeout handler both run asynchronously.
+private final class ContinuationGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var hasResumed = false
+
+    func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !hasResumed else { return false }
+        hasResumed = true
+        return true
+    }
+}
+
 // MARK: - Pairing Service
 
 class PairingService: ObservableObject {
@@ -130,29 +145,27 @@ class LocationSimulator: ObservableObject {
                 port: NWEndpoint.Port(rawValue: port)!,
                 using: .tcp
             )
-            var resumed = false
+            let gate = ContinuationGate()
 
             conn.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
                     conn.send(content: packet, completion: .contentProcessed { err in
                         conn.cancel()
-                        if !resumed {
-                            resumed = true
+                        if gate.claim() {
                             if let err = err { continuation.resume(throwing: err) }
                             else { continuation.resume() }
                         }
                     })
                 case .failed(let err):
-                    if !resumed { resumed = true; conn.cancel(); continuation.resume(throwing: err) }
+                    if gate.claim() { conn.cancel(); continuation.resume(throwing: err) }
                 default: break
                 }
             }
             conn.start(queue: self.queue)
 
             self.queue.asyncAfter(deadline: .now() + 6) {
-                if !resumed {
-                    resumed = true
+                if gate.claim() {
                     conn.cancel()
                     let err = NSError(domain: "Timeout", code: -1, userInfo: [NSLocalizedDescriptionKey: "Verbindung zu Lockdownd abgelaufen"])
                     continuation.resume(throwing: err)
@@ -170,21 +183,21 @@ class LocationSimulator: ObservableObject {
                 port: NWEndpoint.Port(rawValue: port)!,
                 using: .tcp
             )
-            var resumed = false
+            let gate = ContinuationGate()
             conn.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
-                    if !resumed { resumed = true; conn.cancel(); continuation.resume(returning: true) }
+                    if gate.claim() { conn.cancel(); continuation.resume(returning: true) }
                 case .failed:
-                    if !resumed { resumed = true; conn.cancel(); continuation.resume(returning: false) }
+                    if gate.claim() { conn.cancel(); continuation.resume(returning: false) }
                 case .cancelled:
-                    if !resumed { resumed = true; continuation.resume(returning: false) }
+                    if gate.claim() { continuation.resume(returning: false) }
                 default: break
                 }
             }
             conn.start(queue: self.queue)
             self.queue.asyncAfter(deadline: .now() + 3) {
-                if !resumed { resumed = true; conn.cancel(); continuation.resume(returning: false) }
+                if gate.claim() { conn.cancel(); continuation.resume(returning: false) }
             }
         }
     }
