@@ -16,26 +16,28 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Show Available Xcode & SDKs
+      - name: Show Xcode Info
         run: |
           xcodebuild -version
-          xcodebuild -showsdks
           xcodebuild -list
 
-      - name: Build App with Xcodebuild (Unsigned for Sideloadly)
+      - name: Build App with Xcodebuild
         run: |
-          xcodebuild clean build \
+          set -o pipefail
+          xcodebuild build \
             -project LocationSpooferPro.xcodeproj \
             -scheme LocationSpooferPro \
             -configuration Release \
             -destination "generic/platform=iOS" \
             -derivedDataPath build/DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_ALLOWED=YES \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER=""
 
-      - name: Package App into IPA (Payload format)
+      - name: Package App into IPA
         run: |
           mkdir -p build/Payload
           cp -r build/DerivedData/Build/Products/Release-iphoneos/LocationSpooferPro.app build/Payload/
