@@ -65,35 +65,36 @@ class LocationSimulator: ObservableObject {
 
     private let queue = DispatchQueue(label: "pro.spoofer.sim", qos: .userInitiated)
 
-    private init() { addLog("Location Spoofer Pro gestartet", level: .info) }
+    private init() { addLog("Location Spoofer Pro bereit", level: .info) }
 
     func addLog(_ msg: String, level: LogEntry.Level = .info) {
         DispatchQueue.main.async {
             self.logs.append(LogEntry(message: msg, level: level))
-            if self.logs.count > 200 { self.logs.removeFirst() }
+            if self.logs.count > 300 { self.logs.removeFirst() }
         }
     }
 
     func clearLogs() { DispatchQueue.main.async { self.logs.removeAll() } }
 
-    // MARK: Spoof
+    // MARK: - Spoof Action
 
     func spoof(coordinate: CLLocationCoordinate2D, host: String = "127.0.0.1", port: UInt16 = 62078) async throws {
         guard let pairing = PairingService.shared.record, pairing.isValid else {
             DispatchQueue.main.async { self.status = .error }
-            addLog("Fehler: Keine Pairing-Datei!", level: .error)
+            addLog("Fehler: Keine gültige Pairing-Datei!", level: .error)
             throw PairingError.missingCredentials
         }
 
         DispatchQueue.main.async { self.status = .connecting }
-        addLog("Starte Apple Location Service auf \(host):\(port)...", level: .info)
+        addLog("Starte Verbindung zu \(host):\(port)...", level: .info)
 
         do {
-            // Step 1: Handshake with lockdownd and request com.apple.dt.simulatelocation
-            let (targetPort, _) = try await startSimulateLocationService(pairingRecord: pairing, host: host, port: port)
-            addLog("Dienst com.apple.dt.simulatelocation bereit (Port: \(targetPort))", level: .info)
+            // Step 1: Start Location Service via Lockdownd
+            let targetPort = try await acquireLocationServicePort(pairingRecord: pairing, host: host, port: port)
+            addLog("Standortdienst bereit auf Port \(targetPort)", level: .success)
 
-            // Step 2: Send GPS location coordinates to service
+            // Step 2: Inject GPS Coordinates
+            addLog(String(format: "Sende GPS: %.5f, %.5f...", coordinate.latitude, coordinate.longitude), level: .info)
             try await sendLocationPacket(lat: coordinate.latitude, lon: coordinate.longitude, host: host, port: targetPort)
 
             DispatchQueue.main.async {
@@ -101,38 +102,37 @@ class LocationSimulator: ObservableObject {
                 self.spoofedCoordinate = coordinate
                 self.status = .spoofing
             }
-            addLog(String(format: "Standort aktiv: %.5f, %.5f", coordinate.latitude, coordinate.longitude), level: .success)
+            addLog("Standort erfolgreich systemweit aktiviert! 📍", level: .success)
         } catch {
             DispatchQueue.main.async { self.status = .error }
-            addLog("Fehler: \(error.localizedDescription)", level: .error)
+            addLog("Fehler beim Spoofing: \(error.localizedDescription)", level: .error)
             throw error
         }
     }
 
     func reset(host: String = "127.0.0.1", port: UInt16 = 62078) async {
-        addLog("Setze Standort zurück...", level: .info)
+        addLog("Setze Standort auf echtes GPS zurück...", level: .info)
         do {
             if let pairing = PairingService.shared.record, pairing.isValid {
-                if let (targetPort, _) = try? await startSimulateLocationService(pairingRecord: pairing, host: host, port: port) {
-                    try? await sendResetPacket(host: host, port: targetPort)
-                } else {
-                    try? await sendResetPacket(host: host, port: port)
-                }
+                let targetPort = (try? await acquireLocationServicePort(pairingRecord: pairing, host: host, port: port)) ?? port
+                try await sendResetPacket(host: host, port: targetPort)
             } else {
-                try? await sendResetPacket(host: host, port: port)
+                try await sendResetPacket(host: host, port: port)
             }
+            addLog("Standort erfolgreich zurückgesetzt.", level: .success)
+        } catch {
+            addLog("Hinweis beim Reset: \(error.localizedDescription)", level: .warning)
         }
         DispatchQueue.main.async {
             self.isSpoofing = false
             self.spoofedCoordinate = nil
             self.status = .disconnected
         }
-        addLog("Standort auf echten GPS-Standort zurückgesetzt.", level: .success)
     }
 
-    // MARK: - Lockdownd Handshake & Service Start
+    // MARK: - Acquire Location Service Port
 
-    private func startSimulateLocationService(pairingRecord: PairingRecord, host: String, port: UInt16) async throws -> (port: UInt16, enableSSL: Bool) {
+    private func acquireLocationServicePort(pairingRecord: PairingRecord, host: String, port: UInt16) async throws -> UInt16 {
         return try await withCheckedThrowingContinuation { continuation in
             let conn = NWConnection(
                 host: NWEndpoint.Host(host),
@@ -148,67 +148,61 @@ class LocationSimulator: ObservableObject {
                 }
             }
 
-            func finishWithSuccess(targetPort: UInt16, ssl: Bool) {
+            func finishWithSuccess(targetPort: UInt16) {
                 if gate.claim() {
                     conn.cancel()
-                    continuation.resume(returning: (targetPort, ssl))
+                    continuation.resume(returning: targetPort)
                 }
             }
 
             conn.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
-                    // 1. QueryType
+                    self.addLog("Verbunden mit Lockdownd", level: .info)
+                    // Step 1: QueryType
                     let queryDict: [String: Any] = ["Request": "QueryType"]
-                    self.sendPlist(queryDict, over: conn) { err in
-                        if let err = err {
-                            finishWithError(err)
+                    self.sendPlist(queryDict, over: conn) { qErr in
+                        if let qErr = qErr {
+                            finishWithError(qErr)
                             return
                         }
-                        self.receivePlist(over: conn) { res in
-                            // 2. StartSession
-                            let hostID = pairingRecord.hostID ?? UUID().uuidString
-                            var sessionDict: [String: Any] = [
-                                "Request": "StartSession",
-                                "HostID": hostID
-                            ]
-                            if let buid = pairingRecord.systemBUID, !buid.isEmpty {
-                                sessionDict["SystemBUID"] = buid
-                            }
+                        self.receivePlist(over: conn) { qRes in
+                            switch qRes {
+                            case .failure(let err):
+                                finishWithError(err)
+                            case .success(let typeDict):
+                                self.addLog("Lockdownd Typ: \(typeDict["Type"] as? String ?? "OK")", level: .info)
 
-                            self.sendPlist(sessionDict, over: conn) { sErr in
-                                if let sErr = sErr {
-                                    finishWithError(sErr)
-                                    return
-                                }
-                                self.receivePlist(over: conn) { sessRes in
-                                    // 3. Start com.apple.dt.simulatelocation service
-                                    let serviceDict: [String: Any] = [
-                                        "Request": "StartService",
-                                        "Service": "com.apple.dt.simulatelocation"
-                                    ]
-                                    self.sendPlist(serviceDict, over: conn) { servErr in
-                                        if let servErr = servErr {
-                                            finishWithError(servErr)
-                                            return
-                                        }
-                                        self.receivePlist(over: conn) { startRes in
-                                            switch startRes {
-                                            case .success(let dict):
-                                                if let servPort = dict["Port"] as? Int {
-                                                    let ssl = (dict["EnableServiceSSL"] as? Bool) ?? false
-                                                    finishWithSuccess(targetPort: UInt16(servPort), ssl: ssl)
-                                                } else if let errorMsg = dict["Error"] as? String {
-                                                    let customErr = NSError(domain: "Lockdownd", code: -2, userInfo: [NSLocalizedDescriptionKey: "Dienst-Fehler: \(errorMsg)"])
-                                                    finishWithError(customErr)
+                                // Step 2: Request StartService for com.apple.dt.simulatelocation
+                                let startServiceDict: [String: Any] = [
+                                    "Request": "StartService",
+                                    "Service": "com.apple.dt.simulatelocation"
+                                ]
+                                self.sendPlist(startServiceDict, over: conn) { sErr in
+                                    if let sErr = sErr {
+                                        finishWithError(sErr)
+                                        return
+                                    }
+                                    self.receivePlist(over: conn) { sRes in
+                                        switch sRes {
+                                        case .success(let servDict):
+                                            if let servPort = servDict["Port"] as? Int {
+                                                finishWithSuccess(targetPort: UInt16(servPort))
+                                            } else if let errorMsg = servDict["Error"] as? String {
+                                                self.addLog("Lockdownd Antwort: \(errorMsg)", level: .warning)
+                                                if errorMsg.contains("PasswordProtected") {
+                                                    let err = NSError(domain: "Lockdownd", code: -10, userInfo: [NSLocalizedDescriptionKey: "iPhone ist gesperrt. Bitte entsperren!"])
+                                                    finishWithError(err)
                                                 } else {
-                                                    // Fallback directly to lockdownd port
-                                                    finishWithSuccess(targetPort: port, ssl: false)
+                                                    // Fallback to default port
+                                                    finishWithSuccess(targetPort: port)
                                                 }
-                                            case .failure(_):
-                                                // Fallback port
-                                                finishWithSuccess(targetPort: port, ssl: false)
+                                            } else {
+                                                finishWithSuccess(targetPort: port)
                                             }
+                                        case .failure(_):
+                                            // Direct fallback
+                                            finishWithSuccess(targetPort: port)
                                         }
                                     }
                                 }
@@ -224,8 +218,8 @@ class LocationSimulator: ObservableObject {
             conn.start(queue: self.queue)
 
             self.queue.asyncAfter(deadline: .now() + 8) {
-                let timeoutErr = NSError(domain: "Lockdownd", code: -1, userInfo: [NSLocalizedDescriptionKey: "Lockdownd Timeout auf \(host):\(port)"])
-                finishWithError(timeoutErr)
+                let err = NSError(domain: "Lockdownd", code: -1, userInfo: [NSLocalizedDescriptionKey: "Timeout bei Verbindung zu \(host):\(port)"])
+                finishWithError(err)
             }
         }
     }
@@ -254,14 +248,14 @@ class LocationSimulator: ObservableObject {
                 return
             }
             guard let data = content, data.count == 4 else {
-                let err = NSError(domain: "Lockdownd", code: -3, userInfo: [NSLocalizedDescriptionKey: "Ungültige Antwortlänge"])
+                let err = NSError(domain: "Lockdownd", code: -3, userInfo: [NSLocalizedDescriptionKey: "Ungültige Header-Größe"])
                 completion(.failure(err))
                 return
             }
 
             let length = UInt32(bigEndian: data.withUnsafeBytes { $0.load(as: UInt32.self) })
             guard length > 0, length < 1_000_000 else {
-                let err = NSError(domain: "Lockdownd", code: -4, userInfo: [NSLocalizedDescriptionKey: "Ungültige Paketgröße"])
+                let err = NSError(domain: "Lockdownd", code: -4, userInfo: [NSLocalizedDescriptionKey: "Ungültige Payload-Größe (\(length))"])
                 completion(.failure(err))
                 return
             }
@@ -281,7 +275,7 @@ class LocationSimulator: ObservableObject {
                     if let dict = try PropertyListSerialization.propertyList(from: pData, options: [], format: nil) as? [String: Any] {
                         completion(.success(dict))
                     } else {
-                        let err = NSError(domain: "Lockdownd", code: -6, userInfo: [NSLocalizedDescriptionKey: "Plist konnte nicht dekodiert werden"])
+                        let err = NSError(domain: "Lockdownd", code: -6, userInfo: [NSLocalizedDescriptionKey: "Plist konnte nicht geparst werden"])
                         completion(.failure(err))
                     }
                 } catch {
