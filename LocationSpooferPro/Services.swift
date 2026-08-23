@@ -81,7 +81,7 @@ class LocationSimulator: ObservableObject {
 
     func clearLogs() { DispatchQueue.main.async { self.logs.removeAll() } }
 
-    // MARK: - Main Spoof Workflow (Multi-Strategy with Keep-Alive Stream)
+    // MARK: - Main Spoof Workflow (Auto-Discovery + Keep-Alive Stream)
 
     func spoof(coordinate: CLLocationCoordinate2D, host: String = "10.7.0.1", port: UInt16 = 62078) async throws {
         guard let pairing = PairingService.shared.record, pairing.isValid else {
@@ -93,40 +93,57 @@ class LocationSimulator: ObservableObject {
         stopHeartbeat()
         closeActiveConnection()
 
-        self.currentHost = host
-        self.currentPort = port
-
         DispatchQueue.main.async { self.status = .connecting }
-        addLog("Starte GPS-Spoofing auf \(host):\(port)...", level: .info)
+        addLog(String(format: "Zielkoordinaten: %.5f, %.5f", coordinate.latitude, coordinate.longitude), level: .info)
+
+        // Step 1: Discover Active Lockdownd Host IP
+        let candidateHosts = [host, "10.7.0.2", "127.0.0.1", "10.7.0.1", "::1", "localhost"]
+        var workingHost: String?
+
+        addLog("▶ Suche aktiven Lockdownd-Kanal...", level: .info)
+        for candidate in candidateHosts {
+            if await probeLockdownd(host: candidate, port: port) {
+                workingHost = candidate
+                addLog("✅ Lockdownd antwortet auf \(candidate):\(port)", level: .success)
+                break
+            }
+        }
+
+        let effectiveHost = workingHost ?? host
+        if workingHost == nil {
+            addLog("Hinweis: Kein Lockdownd-QueryType auf Standard-IPs. Versuche Direktverbindung auf \(effectiveHost)...", level: .warning)
+        }
+
+        self.currentHost = effectiveHost
+        self.currentPort = port
 
         var resolvedPort: UInt16 = port
 
-        // --- STRATEGY 1: Full Apple Lockdownd Handshake with ValidatePairing ---
-        addLog("▶ Methode 1: Apple Lockdownd Handshake...", level: .info)
+        // Step 2: Apple Lockdownd Handshake & ValidatePairing
+        addLog("▶ Starte Apple Dienst com.apple.dt.simulatelocation...", level: .info)
         do {
-            let targetPort = try await startLocationServiceWithValidation(pairing: pairing, host: host, port: port)
-            addLog("Dienst com.apple.dt.simulatelocation auf Port \(targetPort)", level: .success)
+            let targetPort = try await startLocationServiceWithValidation(pairing: pairing, host: effectiveHost, port: port)
+            addLog("✅ Dienst bereit auf Port \(targetPort)", level: .success)
             resolvedPort = targetPort
         } catch {
-            addLog("Methode 1 Info: \(error.localizedDescription)", level: .warning)
+            addLog("Handshake Info: \(error.localizedDescription)", level: .warning)
 
-            // --- STRATEGY 2: Direct StartService without Validation ---
-            addLog("▶ Methode 2: Direkte Dienstanforderung...", level: .info)
+            // Step 3: Direct StartService Fallback
             do {
-                let targetPort = try await startLocationServiceDirect(host: host, port: port)
-                addLog("Dienst bereit auf Port \(targetPort)", level: .success)
+                let targetPort = try await startLocationServiceDirect(host: effectiveHost, port: port)
+                addLog("Dienst direkt gestartet auf Port \(targetPort)", level: .success)
                 resolvedPort = targetPort
             } catch {
-                addLog("Methode 2 Info: \(error.localizedDescription)", level: .warning)
+                addLog("Direkt-Info: \(error.localizedDescription)", level: .warning)
                 resolvedPort = port
             }
         }
 
-        // --- CONNECT & ESTABLISH CONTINUOUS GPS STREAM ---
-        addLog("▶ Verbinde mit Standortkanal \(host):\(resolvedPort)...", level: .info)
+        // Step 4: Establish Continuous GPS Simulation Stream
+        addLog("▶ Sende GPS-Koordinaten an \(effectiveHost):\(resolvedPort)...", level: .info)
         do {
-            try await establishSimulationStream(coordinate: coordinate, host: host, port: resolvedPort)
-            startHeartbeat(coordinate: coordinate, host: host, port: resolvedPort)
+            try await establishSimulationStream(coordinate: coordinate, host: effectiveHost, port: resolvedPort)
+            startHeartbeat(coordinate: coordinate, host: effectiveHost, port: resolvedPort)
             completeSpoofSuccess(coordinate)
         } catch {
             DispatchQueue.main.async { self.status = .error }
@@ -142,6 +159,52 @@ class LocationSimulator: ObservableObject {
             self.status = .spoofing
         }
         addLog(String(format: "GPS-Signal aktiv & dauerhaft übertragen: %.5f, %.5f 📍", coordinate.latitude, coordinate.longitude), level: .success)
+    }
+
+    // MARK: - Lockdownd Probe
+
+    private func probeLockdownd(host: String, port: UInt16) async -> Bool {
+        return await withCheckedContinuation { continuation in
+            let conn = NWConnection(
+                host: NWEndpoint.Host(host),
+                port: NWEndpoint.Port(rawValue: port)!,
+                using: .tcp
+            )
+            let gate = ContinuationGate()
+
+            conn.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    let queryDict: [String: Any] = ["Request": "QueryType"]
+                    self.sendPlist(queryDict, over: conn) { qErr in
+                        if qErr != nil {
+                            if gate.claim() { conn.cancel(); continuation.resume(returning: false) }
+                            return
+                        }
+                        self.receivePlist(over: conn) { qRes in
+                            if gate.claim() {
+                                conn.cancel()
+                                switch qRes {
+                                case .success(let dict):
+                                    let type = dict["Type"] as? String ?? ""
+                                    continuation.resume(returning: type.contains("lockdown") || type.contains("Apple"))
+                                case .failure:
+                                    continuation.resume(returning: false)
+                                }
+                            }
+                        }
+                    }
+                case .failed:
+                    if gate.claim() { conn.cancel(); continuation.resume(returning: false) }
+                default: break
+                }
+            }
+
+            conn.start(queue: self.queue)
+            self.queue.asyncAfter(deadline: .now() + 1.5) {
+                if gate.claim() { conn.cancel(); continuation.resume(returning: false) }
+            }
+        }
     }
 
     // MARK: - Reset Action
@@ -274,7 +337,7 @@ class LocationSimulator: ObservableObject {
                             case .failure(let err): finishWithError(err)
                             case .success(let typeDict):
                                 let typeName = typeDict["Type"] as? String ?? "OK"
-                                self.addLog("Lockdownd: \(typeName)", level: .info)
+                                self.addLog("Lockdownd Typ: \(typeName)", level: .info)
 
                                 // Step 2: ValidatePairing
                                 let validateDict: [String: Any] = [
@@ -286,7 +349,7 @@ class LocationSimulator: ObservableObject {
 
                                     self.receivePlist(over: conn) { vRes in
                                         let vResult = (try? vRes.get())?["Result"] as? String ?? "Success"
-                                        self.addLog("Pairing: \(vResult)", level: .info)
+                                        self.addLog("Pairing Status: \(vResult)", level: .info)
 
                                         // Step 3: StartService com.apple.dt.simulatelocation
                                         let startDict: [String: Any] = [
