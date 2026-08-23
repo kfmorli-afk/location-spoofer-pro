@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 public struct LogConsoleSheetView: View {
     @ObservedObject var simulationClient = LocationSimulationClient.shared

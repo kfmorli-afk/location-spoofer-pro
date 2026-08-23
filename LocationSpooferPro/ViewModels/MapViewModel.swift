@@ -3,6 +3,7 @@ import SwiftUI
 import MapKit
 import CoreLocation
 import Combine
+import UIKit
 
 public class MapViewModel: ObservableObject {
     // MARK: - Map State

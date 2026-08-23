@@ -1,6 +1,8 @@
 import Foundation
 import CoreLocation
 import Combine
+import CoreGraphics
+import UIKit
 
 public class MovementSimulator: ObservableObject {
     public static let shared = MovementSimulator()

@@ -354,5 +354,7 @@ class SpoofPinAnnotation: NSObject, MKAnnotation {
     init(coordinate: CLLocationCoordinate2D, title: String? = nil) {
         self.coordinate = coordinate
         self.title = title
+        super.init()
     }
 }
+

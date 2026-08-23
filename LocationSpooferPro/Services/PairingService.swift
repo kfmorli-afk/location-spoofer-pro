@@ -93,17 +93,10 @@ public class PairingService: ObservableObject {
             return nil
         }
         
-        // Return identity if already available in keychain or construct identity
-        var identity: SecIdentity?
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassIdentity,
-            kSecReturnRef as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        
-        let status = SecItemCopyMatching(query as CFDictionary, &identity as? AnyObject as! UnsafeMutablePointer<AnyObject?>)
-        if status == errSecSuccess, let found = identity {
-            return found
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecSuccess, let found = item {
+            return (found as! SecIdentity)
         }
         
         return nil

@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import UIKit
 
 public struct LocationControlCard: View {
     @EnvironmentObject var mapViewModel: MapViewModel
