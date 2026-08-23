@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import Security
 
 // MARK: - Saved Location
 
@@ -52,6 +53,18 @@ struct PairingRecord: Codable, Equatable {
         guard !udid.isEmpty else { return "Gekoppelt (Zertifikate aktiv)" }
         let short = udid.count > 12 ? "\(udid.prefix(8))…\(udid.suffix(4))" : udid
         return "UDID: \(short)"
+    }
+
+    func toPlistDictionary() -> [String: Any] {
+        var dict: [String: Any] = [:]
+        if !udid.isEmpty { dict["UDID"] = udid }
+        if let hostID = hostID { dict["HostID"] = hostID }
+        if let systemBUID = systemBUID { dict["SystemBUID"] = systemBUID }
+        if let hostCert = hostCertificateData { dict["HostCertificate"] = hostCert }
+        if let hostKey = hostPrivateKeyData { dict["HostPrivateKey"] = hostKey }
+        if let rootCert = rootCertificateData { dict["RootCertificate"] = rootCert }
+        if let deviceCert = deviceCertificateData { dict["DeviceCertificate"] = deviceCert }
+        return dict
     }
 
     static func parse(from data: Data, fileName: String) throws -> PairingRecord {

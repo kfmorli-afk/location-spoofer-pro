@@ -133,7 +133,7 @@ struct SettingsSheet: View {
                     HStack {
                         Text("Host IP")
                         Spacer()
-                        TextField("127.0.0.1", text: $state.lockdownHost)
+                        TextField("10.7.0.1", text: $state.lockdownHost)
                             .multilineTextAlignment(.trailing)
                             .font(.system(size: 14, design: .monospaced))
                     }

@@ -35,7 +35,7 @@ class AppState: ObservableObject {
     @Published var isProcessing = false
 
     // Settings
-    @Published var lockdownHost = "127.0.0.1"
+    @Published var lockdownHost = "10.7.0.1"
     @Published var lockdownPort = "62078"
     @Published var showAlert = false
     @Published var alertMessage = ""
@@ -219,7 +219,7 @@ class AppState: ObservableObject {
     // MARK: - Settings
 
     func loadSettings() {
-        lockdownHost = UserDefaults.standard.string(forKey: "LockdownHost") ?? "127.0.0.1"
+        lockdownHost = UserDefaults.standard.string(forKey: "LockdownHost") ?? "10.7.0.1"
         lockdownPort = UserDefaults.standard.string(forKey: "LockdownPort") ?? "62078"
     }
 
