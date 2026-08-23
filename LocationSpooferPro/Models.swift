@@ -36,6 +36,7 @@ struct SavedLocation: Identifiable, Codable, Equatable {
 struct PairingRecord: Codable, Equatable {
     var udid: String
     var hostID: String?
+    var systemBUID: String?
     var hostCertificateData: Data?
     var hostPrivateKeyData: Data?
     var rootCertificateData: Data?
@@ -71,6 +72,7 @@ struct PairingRecord: Codable, Equatable {
         return PairingRecord(
             udid: udid,
             hostID: plist["HostID"] as? String,
+            systemBUID: plist["SystemBUID"] as? String,
             hostCertificateData: plist["HostCertificate"] as? Data,
             hostPrivateKeyData: plist["HostPrivateKey"] as? Data,
             rootCertificateData: plist["RootCertificate"] as? Data,

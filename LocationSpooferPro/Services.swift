@@ -4,7 +4,6 @@ import MapKit
 import Network
 
 /// Synchronizes callbacks that race to finish the same Swift continuation.
-/// `NWConnection` state changes and the timeout handler both run asynchronously.
 private final class ContinuationGate: @unchecked Sendable {
     private let lock = NSLock()
     private var hasResumed = false
@@ -87,31 +86,212 @@ class LocationSimulator: ObservableObject {
         }
 
         DispatchQueue.main.async { self.status = .connecting }
-        addLog("Verbinde mit Lockdownd \(host):\(port)...", level: .info)
+        addLog("Starte Apple Location Service auf \(host):\(port)...", level: .info)
 
-        // Send the binary location packet
-        try await sendLocationPacket(lat: coordinate.latitude, lon: coordinate.longitude, host: host, port: port)
+        do {
+            // Step 1: Handshake with lockdownd and request com.apple.dt.simulatelocation
+            let (targetPort, _) = try await startSimulateLocationService(pairingRecord: pairing, host: host, port: port)
+            addLog("Dienst com.apple.dt.simulatelocation bereit (Port: \(targetPort))", level: .info)
 
-        DispatchQueue.main.async {
-            self.isSpoofing = true
-            self.spoofedCoordinate = coordinate
-            self.status = .spoofing
+            // Step 2: Send GPS location coordinates to service
+            try await sendLocationPacket(lat: coordinate.latitude, lon: coordinate.longitude, host: host, port: targetPort)
+
+            DispatchQueue.main.async {
+                self.isSpoofing = true
+                self.spoofedCoordinate = coordinate
+                self.status = .spoofing
+            }
+            addLog(String(format: "Standort aktiv: %.5f, %.5f", coordinate.latitude, coordinate.longitude), level: .success)
+        } catch {
+            DispatchQueue.main.async { self.status = .error }
+            addLog("Fehler: \(error.localizedDescription)", level: .error)
+            throw error
         }
-        addLog(String(format: "Standort gesetzt: %.5f, %.5f", coordinate.latitude, coordinate.longitude), level: .success)
     }
 
     func reset(host: String = "127.0.0.1", port: UInt16 = 62078) async {
         addLog("Setze Standort zurück...", level: .info)
-        try? await sendResetPacket(host: host, port: port)
+        do {
+            if let pairing = PairingService.shared.record, pairing.isValid {
+                if let (targetPort, _) = try? await startSimulateLocationService(pairingRecord: pairing, host: host, port: port) {
+                    try? await sendResetPacket(host: host, port: targetPort)
+                } else {
+                    try? await sendResetPacket(host: host, port: port)
+                }
+            } else {
+                try? await sendResetPacket(host: host, port: port)
+            }
+        }
         DispatchQueue.main.async {
             self.isSpoofing = false
             self.spoofedCoordinate = nil
             self.status = .disconnected
         }
-        addLog("Standort zurückgesetzt.", level: .success)
+        addLog("Standort auf echten GPS-Standort zurückgesetzt.", level: .success)
     }
 
-    // MARK: Binary Protocol
+    // MARK: - Lockdownd Handshake & Service Start
+
+    private func startSimulateLocationService(pairingRecord: PairingRecord, host: String, port: UInt16) async throws -> (port: UInt16, enableSSL: Bool) {
+        return try await withCheckedThrowingContinuation { continuation in
+            let conn = NWConnection(
+                host: NWEndpoint.Host(host),
+                port: NWEndpoint.Port(rawValue: port)!,
+                using: .tcp
+            )
+            let gate = ContinuationGate()
+
+            func finishWithError(_ err: Error) {
+                if gate.claim() {
+                    conn.cancel()
+                    continuation.resume(throwing: err)
+                }
+            }
+
+            func finishWithSuccess(targetPort: UInt16, ssl: Bool) {
+                if gate.claim() {
+                    conn.cancel()
+                    continuation.resume(returning: (targetPort, ssl))
+                }
+            }
+
+            conn.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    // 1. QueryType
+                    let queryDict: [String: Any] = ["Request": "QueryType"]
+                    self.sendPlist(queryDict, over: conn) { err in
+                        if let err = err {
+                            finishWithError(err)
+                            return
+                        }
+                        self.receivePlist(over: conn) { res in
+                            // 2. StartSession
+                            let hostID = pairingRecord.hostID ?? UUID().uuidString
+                            var sessionDict: [String: Any] = [
+                                "Request": "StartSession",
+                                "HostID": hostID
+                            ]
+                            if let buid = pairingRecord.systemBUID, !buid.isEmpty {
+                                sessionDict["SystemBUID"] = buid
+                            }
+
+                            self.sendPlist(sessionDict, over: conn) { sErr in
+                                if let sErr = sErr {
+                                    finishWithError(sErr)
+                                    return
+                                }
+                                self.receivePlist(over: conn) { sessRes in
+                                    // 3. Start com.apple.dt.simulatelocation service
+                                    let serviceDict: [String: Any] = [
+                                        "Request": "StartService",
+                                        "Service": "com.apple.dt.simulatelocation"
+                                    ]
+                                    self.sendPlist(serviceDict, over: conn) { servErr in
+                                        if let servErr = servErr {
+                                            finishWithError(servErr)
+                                            return
+                                        }
+                                        self.receivePlist(over: conn) { startRes in
+                                            switch startRes {
+                                            case .success(let dict):
+                                                if let servPort = dict["Port"] as? Int {
+                                                    let ssl = (dict["EnableServiceSSL"] as? Bool) ?? false
+                                                    finishWithSuccess(targetPort: UInt16(servPort), ssl: ssl)
+                                                } else if let errorMsg = dict["Error"] as? String {
+                                                    let customErr = NSError(domain: "Lockdownd", code: -2, userInfo: [NSLocalizedDescriptionKey: "Dienst-Fehler: \(errorMsg)"])
+                                                    finishWithError(customErr)
+                                                } else {
+                                                    // Fallback directly to lockdownd port
+                                                    finishWithSuccess(targetPort: port, ssl: false)
+                                                }
+                                            case .failure(_):
+                                                // Fallback port
+                                                finishWithSuccess(targetPort: port, ssl: false)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                case .failed(let err):
+                    finishWithError(err)
+                default: break
+                }
+            }
+
+            conn.start(queue: self.queue)
+
+            self.queue.asyncAfter(deadline: .now() + 8) {
+                let timeoutErr = NSError(domain: "Lockdownd", code: -1, userInfo: [NSLocalizedDescriptionKey: "Lockdownd Timeout auf \(host):\(port)"])
+                finishWithError(timeoutErr)
+            }
+        }
+    }
+
+    // MARK: - Plist Wire Transport
+
+    private func sendPlist(_ dict: [String: Any], over connection: NWConnection, completion: @escaping (Error?) -> Void) {
+        do {
+            let plistData = try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
+            var length = UInt32(plistData.count).bigEndian
+            var packet = Data(bytes: &length, count: MemoryLayout<UInt32>.size)
+            packet.append(plistData)
+
+            connection.send(content: packet, completion: .contentProcessed { error in
+                completion(error)
+            })
+        } catch {
+            completion(error)
+        }
+    }
+
+    private func receivePlist(over connection: NWConnection, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        connection.receive(minimumIncompleteLength: 4, maximumLength: 4) { content, _, _, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            guard let data = content, data.count == 4 else {
+                let err = NSError(domain: "Lockdownd", code: -3, userInfo: [NSLocalizedDescriptionKey: "Ungültige Antwortlänge"])
+                completion(.failure(err))
+                return
+            }
+
+            let length = UInt32(bigEndian: data.withUnsafeBytes { $0.load(as: UInt32.self) })
+            guard length > 0, length < 1_000_000 else {
+                let err = NSError(domain: "Lockdownd", code: -4, userInfo: [NSLocalizedDescriptionKey: "Ungültige Paketgröße"])
+                completion(.failure(err))
+                return
+            }
+
+            connection.receive(minimumIncompleteLength: Int(length), maximumLength: Int(length)) { payload, _, _, pError in
+                if let pError = pError {
+                    completion(.failure(pError))
+                    return
+                }
+                guard let pData = payload else {
+                    let err = NSError(domain: "Lockdownd", code: -5, userInfo: [NSLocalizedDescriptionKey: "Keine Daten empfangen"])
+                    completion(.failure(err))
+                    return
+                }
+
+                do {
+                    if let dict = try PropertyListSerialization.propertyList(from: pData, options: [], format: nil) as? [String: Any] {
+                        completion(.success(dict))
+                    } else {
+                        let err = NSError(domain: "Lockdownd", code: -6, userInfo: [NSLocalizedDescriptionKey: "Plist konnte nicht dekodiert werden"])
+                        completion(.failure(err))
+                    }
+                } catch {
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
+
+    // MARK: - Binary Location Protocol
 
     private func sendLocationPacket(lat: Double, lon: Double, host: String, port: UInt16) async throws {
         let latStr = String(format: "%.8f", lat)
@@ -167,14 +347,14 @@ class LocationSimulator: ObservableObject {
             self.queue.asyncAfter(deadline: .now() + 6) {
                 if gate.claim() {
                     conn.cancel()
-                    let err = NSError(domain: "Timeout", code: -1, userInfo: [NSLocalizedDescriptionKey: "Verbindung zu Lockdownd abgelaufen"])
+                    let err = NSError(domain: "Timeout", code: -1, userInfo: [NSLocalizedDescriptionKey: "Keine Antwort vom Standort-Dienst auf \(host):\(port)"])
                     continuation.resume(throwing: err)
                 }
             }
         }
     }
 
-    // MARK: VPN Test
+    // MARK: - VPN Test
 
     func testVPN(host: String = "127.0.0.1", port: UInt16 = 62078) async -> Bool {
         return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
