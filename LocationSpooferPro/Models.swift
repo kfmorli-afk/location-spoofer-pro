@@ -44,11 +44,11 @@ struct PairingRecord: Codable, Equatable {
     var importedAt: Date = Date()
 
     var isValid: Bool {
-        return !udid.isEmpty && hostCertificateData != nil && hostPrivateKeyData != nil
+        return hostCertificateData != nil && hostPrivateKeyData != nil
     }
 
     var summary: String {
-        guard !udid.isEmpty else { return "Keine Pairing-Datei geladen" }
+        guard !udid.isEmpty else { return "Gekoppelt (Zertifikate aktiv)" }
         let short = udid.count > 12 ? "\(udid.prefix(8))…\(udid.suffix(4))" : udid
         return "UDID: \(short)"
     }
@@ -57,7 +57,17 @@ struct PairingRecord: Codable, Equatable {
         guard let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] else {
             throw PairingError.invalidFormat
         }
-        let udid = (plist["UDID"] as? String) ?? (plist["DeviceUDID"] as? String) ?? ""
+        var udid = (plist["UDID"] as? String) ?? (plist["DeviceUDID"] as? String) ?? ""
+        if udid.isEmpty {
+            let rawName = (fileName as NSString).deletingPathExtension
+            if rawName.count >= 16 {
+                udid = rawName
+            } else if let hostID = plist["HostID"] as? String {
+                udid = hostID
+            } else {
+                udid = "iPhone-Zertifikat"
+            }
+        }
         return PairingRecord(
             udid: udid,
             hostID: plist["HostID"] as? String,
