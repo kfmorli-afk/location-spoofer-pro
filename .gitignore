@@ -1,0 +1,9 @@
+# Build and temporary files
+build/
+build_temp/
+*.ipa
+.DS_Store
+*.swp
+DerivedData/
+*.xcuserstate
+xcuserdata/

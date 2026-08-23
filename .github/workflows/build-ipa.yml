@@ -1,0 +1,52 @@
+name: Build Location Spoofer Pro IPA
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Package IPA
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+
+      - name: Show Xcode Version
+        run: xcodebuild -version
+
+      - name: Build App with Xcodebuild (Unsigned for Sideloadly)
+        run: |
+          xcodebuild clean build \
+            -project LocationSpooferPro.xcodeproj \
+            -scheme LocationSpooferPro \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
+
+      - name: Package App into IPA (Payload format)
+        run: |
+          mkdir -p build/Payload
+          cp -r build/DerivedData/Build/Products/Release-iphoneos/LocationSpooferPro.app build/Payload/
+          cd build
+          zip -r LocationSpooferPro.ipa Payload
+          cd ..
+          ls -lh build/LocationSpooferPro.ipa
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocationSpooferPro-IPA
+          path: build/LocationSpooferPro.ipa
+          retention-days: 14
