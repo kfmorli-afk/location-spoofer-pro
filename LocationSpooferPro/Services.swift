@@ -65,6 +65,10 @@ class LocationSimulator: ObservableObject {
     @Published var logs: [LogEntry] = []
 
     private let queue = DispatchQueue(label: "pro.spoofer.sim", qos: .userInitiated)
+    private var activeConnection: NWConnection?
+    private var heartbeatTimer: DispatchSourceTimer?
+    private var currentHost: String = "10.7.0.1"
+    private var currentPort: UInt16 = 62078
 
     private init() { addLog("Location Spoofer Pro bereit", level: .info) }
 
@@ -77,7 +81,7 @@ class LocationSimulator: ObservableObject {
 
     func clearLogs() { DispatchQueue.main.async { self.logs.removeAll() } }
 
-    // MARK: - Main Spoof Workflow (Multi-Strategy)
+    // MARK: - Main Spoof Workflow (Multi-Strategy with Keep-Alive Stream)
 
     func spoof(coordinate: CLLocationCoordinate2D, host: String = "10.7.0.1", port: UInt16 = 62078) async throws {
         guard let pairing = PairingService.shared.record, pairing.isValid else {
@@ -86,53 +90,54 @@ class LocationSimulator: ObservableObject {
             throw PairingError.missingCredentials
         }
 
+        stopHeartbeat()
+        closeActiveConnection()
+
+        self.currentHost = host
+        self.currentPort = port
+
         DispatchQueue.main.async { self.status = .connecting }
         addLog("Starte GPS-Spoofing auf \(host):\(port)...", level: .info)
 
         var lastError: Error?
+        var resolvedPort: UInt16 = port
 
         // --- STRATEGY 1: Full Apple Lockdownd Handshake with ValidatePairing ---
-        addLog("▶ Methode 1: Apple Lockdownd Handshake & ValidatePairing...", level: .info)
+        addLog("▶ Methode 1: Apple Lockdownd Handshake...", level: .info)
         do {
             let targetPort = try await startLocationServiceWithValidation(pairing: pairing, host: host, port: port)
-            addLog("Dienst com.apple.dt.simulatelocation läuft auf Port \(targetPort)", level: .success)
-            try await sendLocationPacket(lat: coordinate.latitude, lon: coordinate.longitude, host: host, port: targetPort)
-            completeSpoofSuccess(coordinate)
-            return
+            addLog("Dienst com.apple.dt.simulatelocation auf Port \(targetPort)", level: .success)
+            resolvedPort = targetPort
         } catch {
             addLog("Methode 1 Info: \(error.localizedDescription)", level: .warning)
             lastError = error
+
+            // --- STRATEGY 2: Direct StartService without Validation ---
+            addLog("▶ Methode 2: Direkte Dienstanforderung...", level: .info)
+            do {
+                let targetPort = try await startLocationServiceDirect(host: host, port: port)
+                addLog("Dienst bereit auf Port \(targetPort)", level: .success)
+                resolvedPort = targetPort
+            } catch {
+                addLog("Methode 2 Info: \(error.localizedDescription)", level: .warning)
+                lastError = error
+                // Fallback to direct port
+                resolvedPort = port
+            }
         }
 
-        // --- STRATEGY 2: Direct StartService without Validation ---
-        addLog("▶ Methode 2: Direkte Dienstanforderung...", level: .info)
+        // --- CONNECT & ESTABLISH CONTINUOUS GPS STREAM ---
+        addLog("▶ Verbinde mit Standortkanal \(host):\(resolvedPort)...", level: .info)
         do {
-            let targetPort = try await startLocationServiceDirect(host: host, port: port)
-            addLog("Dienst bereit auf Port \(targetPort)", level: .success)
-            try await sendLocationPacket(lat: coordinate.latitude, lon: coordinate.longitude, host: host, port: targetPort)
+            try await establishSimulationStream(coordinate: coordinate, host: host, port: resolvedPort)
+            startHeartbeat(coordinate: coordinate, host: host, port: resolvedPort)
             completeSpoofSuccess(coordinate)
-            return
         } catch {
-            addLog("Methode 2 Info: \(error.localizedDescription)", level: .warning)
-            lastError = error
+            DispatchQueue.main.async { self.status = .error }
+            let finalErr = lastError ?? error
+            addLog("Spoofing-Fehler: \(finalErr.localizedDescription)", level: .error)
+            throw finalErr
         }
-
-        // --- STRATEGY 3: Direct Binary Injection (for loopback tunnel proxies) ---
-        addLog("▶ Methode 3: Direkte GPS-Paket Injektion...", level: .info)
-        do {
-            try await sendLocationPacket(lat: coordinate.latitude, lon: coordinate.longitude, host: host, port: port)
-            completeSpoofSuccess(coordinate)
-            return
-        } catch {
-            addLog("Methode 3 Info: \(error.localizedDescription)", level: .warning)
-            lastError = error
-        }
-
-        // If all failed
-        DispatchQueue.main.async { self.status = .error }
-        let finalErr = lastError ?? NSError(domain: "SpoofError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Verbindung zu Lockdownd fehlgeschlagen. Bitte LocalDevVPN prüfen!"])
-        addLog("Spoofing fehlgeschlagen: \(finalErr.localizedDescription)", level: .error)
-        throw finalErr
     }
 
     private func completeSpoofSuccess(_ coordinate: CLLocationCoordinate2D) {
@@ -141,30 +146,99 @@ class LocationSimulator: ObservableObject {
             self.spoofedCoordinate = coordinate
             self.status = .spoofing
         }
-        addLog(String(format: "Standort systemweit aktiv: %.5f, %.5f 📍", coordinate.latitude, coordinate.longitude), level: .success)
+        addLog(String(format: "GPS-Signal aktiv & dauerhaft übertragen: %.5f, %.5f 📍", coordinate.latitude, coordinate.longitude), level: .success)
     }
 
     // MARK: - Reset Action
 
     func reset(host: String = "10.7.0.1", port: UInt16 = 62078) async {
         addLog("Setze Standort auf echtes GPS zurück...", level: .info)
-        if let pairing = PairingService.shared.record, pairing.isValid {
-            if let targetPort = try? await startLocationServiceWithValidation(pairing: pairing, host: host, port: port) {
-                try? await sendResetPacket(host: host, port: targetPort)
-            } else if let targetPort = try? await startLocationServiceDirect(host: host, port: port) {
-                try? await sendResetPacket(host: host, port: targetPort)
-            } else {
-                try? await sendResetPacket(host: host, port: port)
-            }
+        stopHeartbeat()
+        
+        if let conn = activeConnection {
+            let resetPacket = makeResetPacket()
+            conn.send(content: resetPacket, completion: .contentProcessed { _ in })
         } else {
-            try? await sendResetPacket(host: host, port: port)
+            try? await sendStandaloneReset(host: host, port: port)
         }
+
+        closeActiveConnection()
+
         DispatchQueue.main.async {
             self.isSpoofing = false
             self.spoofedCoordinate = nil
             self.status = .disconnected
         }
         addLog("Standort zurückgesetzt.", level: .success)
+    }
+
+    // MARK: - Continuous Simulation Stream
+
+    private func establishSimulationStream(coordinate: CLLocationCoordinate2D, host: String, port: UInt16) async throws {
+        return try await withCheckedThrowingContinuation { continuation in
+            let conn = NWConnection(
+                host: NWEndpoint.Host(host),
+                port: NWEndpoint.Port(rawValue: port)!,
+                using: .tcp
+            )
+            let gate = ContinuationGate()
+            self.activeConnection = conn
+
+            conn.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    let packet = self.makeLocationPacket(lat: coordinate.latitude, lon: coordinate.longitude)
+                    conn.send(content: packet, completion: .contentProcessed { err in
+                        if gate.claim() {
+                            if let err = err {
+                                continuation.resume(throwing: err)
+                            } else {
+                                continuation.resume()
+                            }
+                        }
+                    })
+                case .failed(let err):
+                    if gate.claim() {
+                        continuation.resume(throwing: err)
+                    }
+                default: break
+                }
+            }
+
+            conn.start(queue: self.queue)
+
+            self.queue.asyncAfter(deadline: .now() + 6) {
+                if gate.claim() {
+                    let err = NSError(domain: "LocationService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Timeout bei Verbindung zum Standortkanal \(host):\(port)"])
+                    continuation.resume(throwing: err)
+                }
+            }
+        }
+    }
+
+    private func startHeartbeat(coordinate: CLLocationCoordinate2D, host: String, port: UInt16) {
+        stopHeartbeat()
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + 2.0, repeating: 2.0)
+        timer.setEventHandler { [weak self] in
+            guard let self = self, self.isSpoofing else { return }
+            let packet = self.makeLocationPacket(lat: coordinate.latitude, lon: coordinate.longitude)
+            if let conn = self.activeConnection {
+                conn.send(content: packet, completion: .contentProcessed { _ in })
+            }
+        }
+        timer.resume()
+        self.heartbeatTimer = timer
+    }
+
+    private func stopHeartbeat() {
+        heartbeatTimer?.cancel()
+        heartbeatTimer = nil
+    }
+
+    private func closeActiveConnection() {
+        activeConnection?.cancel()
+        activeConnection = nil
     }
 
     // MARK: - Strategy 1: Lockdownd with ValidatePairing
@@ -195,7 +269,6 @@ class LocationSimulator: ObservableObject {
             conn.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
-                    // 1. QueryType
                     let queryDict: [String: Any] = ["Request": "QueryType"]
                     self.sendPlist(queryDict, over: conn) { qErr in
                         if let qErr = qErr { finishWithError(qErr); return }
@@ -206,7 +279,6 @@ class LocationSimulator: ObservableObject {
                             case .success(let typeDict):
                                 self.addLog("Lockdownd: \(typeDict["Type"] as? String ?? "OK")", level: .info)
 
-                                // 2. ValidatePairing
                                 let validateDict: [String: Any] = [
                                     "Request": "ValidatePairing",
                                     "PairingRecord": pairing.toPlistDictionary()
@@ -215,7 +287,6 @@ class LocationSimulator: ObservableObject {
                                     if let vErr = vErr { finishWithError(vErr); return }
 
                                     self.receivePlist(over: conn) { vRes in
-                                        // 3. StartService com.apple.dt.simulatelocation
                                         let startDict: [String: Any] = [
                                             "Request": "StartService",
                                             "Service": "com.apple.dt.simulatelocation"
@@ -253,7 +324,7 @@ class LocationSimulator: ObservableObject {
             conn.start(queue: self.queue)
 
             self.queue.asyncAfter(deadline: .now() + 6) {
-                let err = NSError(domain: "Lockdownd", code: -1, userInfo: [NSLocalizedDescriptionKey: "Timeout bei Verbindung zu \(host):\(port)"])
+                let err = NSError(domain: "Lockdownd", code: -1, userInfo: [NSLocalizedDescriptionKey: "Timeout bei Lockdownd auf \(host):\(port)"])
                 finishWithError(err)
             }
         }
@@ -325,7 +396,7 @@ class LocationSimulator: ObservableObject {
         }
     }
 
-    // MARK: - Plist Wire Transport
+    // MARK: - Plist Transport Helpers
 
     private func sendPlist(_ dict: [String: Any], over connection: NWConnection, completion: @escaping (Error?) -> Void) {
         do {
@@ -386,13 +457,13 @@ class LocationSimulator: ObservableObject {
         }
     }
 
-    // MARK: - Binary Location Protocol
+    // MARK: - Binary Packets
 
-    private func sendLocationPacket(lat: Double, lon: Double, host: String, port: UInt16) async throws {
+    private func makeLocationPacket(lat: Double, lon: Double) -> Data {
         let latStr = String(format: "%.8f", lat)
         let lonStr = String(format: "%.8f", lon)
         guard let latData = latStr.data(using: .utf8),
-              let lonData = lonStr.data(using: .utf8) else { return }
+              let lonData = lonStr.data(using: .utf8) else { return Data() }
 
         var packet = Data()
         var cmd: UInt32 = UInt32(1).bigEndian
@@ -403,17 +474,15 @@ class LocationSimulator: ObservableObject {
         var lonLen: UInt32 = UInt32(lonData.count).bigEndian
         packet.append(Data(bytes: &lonLen, count: 4))
         packet.append(lonData)
-
-        try await sendPacket(packet, host: host, port: port)
+        return packet
     }
 
-    private func sendResetPacket(host: String, port: UInt16) async throws {
+    private func makeResetPacket() -> Data {
         var cmd: UInt32 = UInt32(0).bigEndian
-        let packet = Data(bytes: &cmd, count: 4)
-        try await sendPacket(packet, host: host, port: port)
+        return Data(bytes: &cmd, count: 4)
     }
 
-    private func sendPacket(_ packet: Data, host: String, port: UInt16) async throws {
+    private func sendStandaloneReset(host: String, port: UInt16) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let conn = NWConnection(
                 host: NWEndpoint.Host(host),
@@ -421,6 +490,7 @@ class LocationSimulator: ObservableObject {
                 using: .tcp
             )
             let gate = ContinuationGate()
+            let packet = self.makeResetPacket()
 
             conn.stateUpdateHandler = { state in
                 switch state {
@@ -438,13 +508,8 @@ class LocationSimulator: ObservableObject {
                 }
             }
             conn.start(queue: self.queue)
-
-            self.queue.asyncAfter(deadline: .now() + 6) {
-                if gate.claim() {
-                    conn.cancel()
-                    let err = NSError(domain: "Timeout", code: -1, userInfo: [NSLocalizedDescriptionKey: "Keine Antwort vom Standort-Dienst auf \(host):\(port)"])
-                    continuation.resume(throwing: err)
-                }
+            self.queue.asyncAfter(deadline: .now() + 4) {
+                if gate.claim() { conn.cancel(); continuation.resume() }
             }
         }
     }
